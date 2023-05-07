@@ -6,14 +6,16 @@ RUN apt-get update && apt-get install -y openssl sqlite3
 # Install all node_modules, including dev dependencies
 FROM base as deps
 WORKDIR /app
-ADD package.json ./
-RUN npm install --omit=dev
+ADD package.json .npmrc ./
+RUN --mount=type=secret,id=NPM_GITHUB_TOKEN \
+  NPM_GITHUB_TOKEN=$(cat /run/secrets/NPM_GITHUB_TOKEN) \
+  npm install --omit=dev
 
 # Setup production node_modules
 FROM base as production-deps
 WORKDIR /app
 COPY --from=deps /app/node_modules /app/node_modules
-ADD package.json ./
+ADD package.json .npmrc ./
 RUN npm prune --omit=dev
 
 # Build the app
