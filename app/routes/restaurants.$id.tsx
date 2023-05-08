@@ -13,7 +13,10 @@ export const action = async ({ request, params }: ActionArgs) => {
     throw new Error("Invalid comment or restaurant");
   }
 
-  const sentiment = await modelService.fetchSentiment(comment);
+  const sentiment = await modelService.fetchSentiment(comment).catch(e => {
+    console.error(e);
+    return null;
+  });
 
   const fields = {
     restaurantId,
@@ -62,7 +65,7 @@ export default function Restaurant() {
           {data.restaurant.reviews.map((review) => (
             <div key={review.id} className="border-b last:border-0 border-gray-200 py-4">
               <p className="text-lg leading-8 text-gray-600">
-                <span className="mr-4">{review.sentiment ? '😄' : '😐'}</span>
+                <span className="mr-4">{parseSentiment(review.sentiment)}</span>
                 {review.comment}
               </p>
             </div>
@@ -71,4 +74,9 @@ export default function Restaurant() {
       </div>
     </div>
   );
+
+  function parseSentiment(sentiment: boolean | null): string {
+    if (sentiment === null) return '😵‍💫';
+    return sentiment ? '😄' : '😐';
+  }
 }

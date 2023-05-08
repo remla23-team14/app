@@ -23,7 +23,7 @@ model Review {
   id           String     @id @default(uuid())
   createdAt    DateTime   @default(now())
   comment      String
-  sentiment    Boolean
+  sentiment    Boolean?
   Restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
   restaurantId String
 }

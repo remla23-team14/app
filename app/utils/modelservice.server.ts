@@ -2,7 +2,7 @@ import {fetch} from '@remix-run/node';
 import * as process from 'process';
 
 class ModelService {
-  fetchSentiment(msg: string): Promise<boolean> {
+  async fetchSentiment(msg: string): Promise<boolean> {
     const url = process.env.MODEL_SERVICE_URL;
     if (url == null) throw new Error('MODEL_SERVICE_URL not set');
     return fetch(url, {
