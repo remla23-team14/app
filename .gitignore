@@ -9,3 +9,4 @@ node_modules
 .DS_Store
 
 /prisma/dev.db
+NPM_GITHUB_TOKEN.txt

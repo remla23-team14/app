@@ -11,6 +11,4 @@ exit_gracefully() {
 trap "exit_gracefully" INT
 
 set -ex
-npx prisma db push
-npx ts-node --require tsconfig-paths/register prisma/seed.ts
 npm run start & wait

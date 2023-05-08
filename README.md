@@ -16,3 +16,13 @@ The application is built using [Remix](https://remix.run/).
    ```sh
    npm run dev
    ```
+
+## Building the Docker Image
+1. Export your personal access token with `read:packages` scope into a file called `NPM_GITHUB_TOKEN.txt`:
+   ```sh
+   printf "ghp_..." > NPM_GITHUB_TOKEN.txt
+   ```
+2. Build the image using the secret file:
+   ```sh
+   docker build --secret id=NPM_GITHUB_TOKEN,src=./NPM_GITHUB_TOKEN.txt .
+   ```

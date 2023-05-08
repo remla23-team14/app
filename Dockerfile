@@ -9,7 +9,7 @@ WORKDIR /app
 ADD package.json .npmrc ./
 RUN --mount=type=secret,id=NPM_GITHUB_TOKEN \
   NPM_GITHUB_TOKEN=$(cat /run/secrets/NPM_GITHUB_TOKEN) \
-  npm install --omit=dev
+  npm install
 
 # Setup production node_modules
 FROM base as production-deps
@@ -46,5 +46,8 @@ COPY --from=build /app/public /app/public
 COPY --from=build /app/package.json /app/package.json
 COPY --from=build /app/start.sh /app/start.sh
 COPY --from=build /app/prisma /app/prisma
+
+RUN npx prisma db push
+RUN npx ts-node --require tsconfig-paths/register prisma/seed.ts
 
 ENTRYPOINT [ "./start.sh" ]
