@@ -3,6 +3,7 @@ import {json, redirect} from '@remix-run/node';
 import {useLoaderData} from "@remix-run/react";
 
 import { db } from "~/utils/db.server";
+import {modelService} from '~/utils/modelservice.server';
 
 export const action = async ({ request, params }: ActionArgs) => {
   const form = await request.formData();
@@ -12,9 +13,12 @@ export const action = async ({ request, params }: ActionArgs) => {
     throw new Error("Invalid comment or restaurant");
   }
 
+  const sentiment = await modelService.fetchSentiment(comment);
+
   const fields = {
     restaurantId,
     comment,
+    sentiment,
   };
 
   await db.review.create({ data: fields });
@@ -57,7 +61,10 @@ export default function Restaurant() {
         <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
           {data.restaurant.reviews.map((review) => (
             <div key={review.id} className="border-b last:border-0 border-gray-200 py-4">
-              <p className="text-lg leading-8 text-gray-600">{review.comment}</p>
+              <p className="text-lg leading-8 text-gray-600">
+                <span className="mr-4">{review.sentiment ? '😄' : '😐'}</span>
+                {review.comment}
+              </p>
             </div>
           ))}
         </div>
