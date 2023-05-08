@@ -2,11 +2,18 @@ name: Release
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+env:
+  PLATFORMS: 'linux/amd64,linux/arm64'
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: ${{ env.PLATFORMS }}
       - uses: docker/setup-buildx-action@v2
       - name: Setup Docker Metadata
         id: meta
@@ -33,5 +40,6 @@ jobs:
           cache-to: type=gha,mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ env.PLATFORMS }}
           secrets: |
             "NPM_GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}"
