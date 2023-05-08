@@ -9,14 +9,14 @@ WORKDIR /app
 ADD package.json .npmrc ./
 RUN --mount=type=secret,id=NPM_GITHUB_TOKEN \
   NPM_GITHUB_TOKEN=$(cat /run/secrets/NPM_GITHUB_TOKEN) \
-  npm install
+  npm install --production=false
 
 # Setup production node_modules
 FROM base as production-deps
 WORKDIR /app
 COPY --from=deps /app/node_modules /app/node_modules
 ADD package.json .npmrc ./
-RUN npm prune --omit=dev
+RUN npm prune --production
 
 # Build the app
 FROM base as build
