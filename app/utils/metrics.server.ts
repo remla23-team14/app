@@ -20,6 +20,7 @@ function createMetricsApp(): Express {
     prom({
       metricsPath: "/metrics",
       collectDefaultMetrics: true,
+      prefix: 'app_',
     }),
   );
 
