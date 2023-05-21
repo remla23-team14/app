@@ -17,6 +17,7 @@
     "@remla23-team14/lib": "^0.0.1",
     "express": "^4.18.2",
     "isbot": "^3.6.8",
+    "prom-client": "^13.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

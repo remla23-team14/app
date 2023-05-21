@@ -1,8 +1,16 @@
 import { db } from "~/utils/db.server";
 import {useLoaderData} from '@remix-run/react';
-import {json} from '@remix-run/node';
+import {json, LoaderArgs} from '@remix-run/node';
+import {metrics} from '~/utils/metrics.server';
 
-export const loader = async () => {
+export const loader = async ({ request }: LoaderArgs) => {
+  metrics.pageVisitsCounter.labels({
+    method: request.method,
+    path: new URL(request.url).pathname,
+    restaurantId: '',
+    restaurantName: '',
+  }).inc();
+
   return json({
     restaurantCount: await db.restaurant.count(),
   });

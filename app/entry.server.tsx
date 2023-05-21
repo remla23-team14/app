@@ -14,7 +14,7 @@ import { renderToPipeableStream } from "react-dom/server";
 import { metrics } from '~/utils/metrics.server';
 
 const ABORT_DELAY = 5_000;
-metrics.init();
+metrics.registerMetrics();
 
 export default function handleRequest(
   request: Request,

@@ -1,34 +1,50 @@
 import type {ActionArgs, LoaderArgs} from '@remix-run/node';
-import {json, redirect} from '@remix-run/node';
-import {useLoaderData} from "@remix-run/react";
+import {json} from '@remix-run/node';
+import {useActionData, useLoaderData} from '@remix-run/react';
 
-import { db } from "~/utils/db.server";
+import {db} from "~/utils/db.server";
 import {modelService} from '~/utils/modelservice.server';
+import {metrics} from '~/utils/metrics.server';
+
+function registerPageVisit(request: Request, restaurant: {id: string; name: string}) {
+  metrics.pageVisitsCounter.labels({
+    method: request.method,
+    path: new URL(request.url).pathname,
+    restaurantId: restaurant.id,
+    restaurantName: restaurant.name,
+  }).inc();
+}
 
 export const action = async ({ request, params }: ActionArgs) => {
   const form = await request.formData();
   const comment = form.get("comment");
-  const restaurantId = params.id;
-  if (typeof comment !== "string" || typeof restaurantId !== "string") {
-    throw new Error("Invalid comment or restaurant");
+  if (typeof comment !== "string") {
+    throw new Error("Invalid comment");
   }
+
+  const restaurant = await db.restaurant.findUnique({ where: { id: params.id } });
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  registerPageVisit(request, restaurant);
 
   const sentiment = await modelService.fetchSentiment(comment).catch(e => {
     console.error(e);
     return null;
   });
 
-  const fields = {
-    restaurantId,
+  const data = {
+    restaurantId: restaurant.id,
     comment,
     sentiment,
   };
 
-  await db.review.create({ data: fields });
-  return redirect(`/restaurants/${restaurantId}`);
+  const review = await db.review.create({ data });
+  return json(review);
 };
 
-export const loader = async ({ params }: LoaderArgs) => {
+export const loader = async ({ params, request }: LoaderArgs) => {
   const restaurant = await db.restaurant.findUnique({
     where: { id: params.id },
     include: {
@@ -38,17 +54,24 @@ export const loader = async ({ params }: LoaderArgs) => {
   if (!restaurant) {
     throw new Error("Restaurant not found");
   }
+
+  registerPageVisit(request, restaurant);
   return json({ restaurant });
 };
 
 export default function Restaurant() {
-  const data = useLoaderData<typeof loader>();
+  const { restaurant } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  if (actionData && !restaurant.reviews.some(review => review.id === actionData.id)) {
+    restaurant.reviews.push(actionData);
+  }
+
   return (
     <div>
       <div className="flex flex-col items-center justify-center">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">{data.restaurant.name}</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">{restaurant.name}</h1>
         <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:max-w-7xl lg:px-8 whitespace-pre">
-          {data.restaurant.description}
+          {restaurant.description}
         </div>
 
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Add Your Review</h2>
@@ -62,7 +85,7 @@ export default function Restaurant() {
         </form>
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Reviews</h2>
         <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
-          {data.restaurant.reviews.map((review) => (
+          {restaurant.reviews.map((review) => (
             <div key={review.id} className="border-b last:border-0 border-gray-200 py-4">
               <p className="text-lg leading-8 text-gray-600">
                 <span className="mr-4">{parseSentiment(review.sentiment)}</span>
