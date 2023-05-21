@@ -15,8 +15,7 @@ function registerPageVisit(request: Request, restaurant: {id: string; name: stri
   }).inc();
 }
 
-export const action = async ({ request, params }: ActionArgs) => {
-  const form = await request.formData();
+async function handleAddComment({request, params}: ActionArgs, form: FormData) {
   const comment = form.get("comment");
   if (typeof comment !== "string") {
     throw new Error("Invalid comment");
@@ -29,7 +28,7 @@ export const action = async ({ request, params }: ActionArgs) => {
 
   registerPageVisit(request, restaurant);
 
-  const sentiment = await modelService.fetchSentiment(comment).catch(e => {
+  const sentiment = await modelService.predictSentiment(comment).catch(e => {
     console.error(e);
     return null;
   });
@@ -41,7 +40,62 @@ export const action = async ({ request, params }: ActionArgs) => {
   };
 
   const review = await db.review.create({ data });
-  return json(review);
+  return { review };
+}
+
+async function handleRefreshSentiment({request, params}: ActionArgs, form: FormData) {
+  const reviewId = form.get("reviewId");
+  if (typeof reviewId !== "string") throw new Error("Invalid reviewId");
+
+  const review = await db.review.findUnique({ where: { id: reviewId } });
+  if (!review) throw new Error("Review not found");
+
+  review.sentiment = await modelService.predictSentiment(review.comment).catch(e => {
+    console.error(e);
+    return null;
+  });
+  await db.review.update({ where: { id: reviewId }, data: review });
+
+  return { review };
+}
+
+async function handleToggleSentiment({request, params}: ActionArgs, form: FormData) {
+  const reviewId = form.get("reviewId");
+  if (typeof reviewId !== "string") throw new Error("Invalid reviewId");
+
+  const review = await db.review.findUnique({ where: { id: reviewId } });
+  if (!review) throw new Error("Review not found");
+  if (review.sentiment == null) throw new Error("Review has no sentiment");
+
+  review.sentiment = await modelService.toggleSentiment(review.comment, review.sentiment).catch(e => {
+    console.error(e);
+    return review.sentiment;
+  });
+  await db.review.update({ where: { id: reviewId }, data: review });
+
+  return { review };
+}
+
+export const action = async (args: ActionArgs) => {
+  const form = await args.request.formData();
+  const action = form.get("action");
+
+  let data = null;
+  switch (action) {
+    case "add-review":
+      data = await handleAddComment(args, form);
+      break;
+    case "refresh-sentiment":
+      data = await handleRefreshSentiment(args, form);
+      break;
+    case "toggle-sentiment":
+      data = await handleToggleSentiment(args, form);
+      break;
+    default:
+      return json({ error: "Invalid action" }, { status: 400 });
+  }
+
+  return json({ action, data });
 };
 
 export const loader = async ({ params, request }: LoaderArgs) => {
@@ -62,8 +116,19 @@ export const loader = async ({ params, request }: LoaderArgs) => {
 export default function Restaurant() {
   const { restaurant } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  if (actionData && !restaurant.reviews.some(review => review.id === actionData.id)) {
-    restaurant.reviews.push(actionData);
+  if (actionData != null && 'action' in actionData && actionData.data != null) {
+    switch (actionData.action) {
+      case 'add-review':
+        // const { review } = actionData.data;
+        // if (!restaurant.reviews.some(r => r.id === review.id)) {
+        //   restaurant.reviews.push(review);
+        // }
+        // break;
+      case 'refresh-sentiment':
+        break;
+      case 'toggle-sentiment':
+        break;
+    }
   }
 
   return (
@@ -82,15 +147,21 @@ export default function Restaurant() {
           <div className="mt-6 flex items-center justify-end gap-x-6">
             <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
           </div>
+          <input type="hidden" name="action" value="add-review" />
         </form>
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Reviews</h2>
         <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
           {restaurant.reviews.map((review) => (
             <div key={review.id} className="border-b last:border-0 border-gray-200 py-4">
-              <p className="text-lg leading-8 text-gray-600">
+              <div className="flex text-lg leading-8 text-gray-600 min-w-[400px]">
                 <span className="mr-4">{parseSentiment(review.sentiment)}</span>
-                {review.comment}
-              </p>
+                <p className="grow inline-block">{review.comment}</p>
+                <form method="post" className="ml-4 inline-block">
+                  <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">{review.sentiment == null ? 'Refresh' : 'Toggle'}</button>
+                  <input type="hidden" name="reviewId" value={review.id} />
+                  <input type="hidden" name="action" value={review.sentiment == null ? 'refresh-sentiment' : 'toggle-sentiment'} />
+                </form>
+              </div>
             </div>
           ))}
         </div>
