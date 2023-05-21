@@ -3,16 +3,17 @@ Contains a frontend web application that brings together all pieces.
 The application is built using [Remix](https://remix.run/).
 
 ## Usage
-1. Export your personal access token with `read:packages` scope as `NPM_GITHUB_TOKEN` environment variable.
+1. Make sure you have [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) installed.
+2. Export your personal access token with `read:packages` scope as `NPM_GITHUB_TOKEN` environment variable. For example:
    ```sh
    export NPM_GITHUB_TOKEN=ghp_... 
    ```
-2. Copy `development.env` to `.env` and fill in the appropriate environment variables.
-3. Install dependencies:
+3. Copy `development.env` to `.env` and fill in the appropriate environment variables.
+4. Install dependencies:
    ```sh
    npm install
    ```
-4. Run the application:
+5. Run the application:
    ```sh
    npm run dev
    ```
