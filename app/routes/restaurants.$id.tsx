@@ -68,7 +68,7 @@ async function handleToggleSentiment({request, params}: ActionArgs, form: FormDa
   if (!review) throw new Error("Review not found");
   if (review.sentiment == null) throw new Error("Review has no sentiment");
 
-  review.sentiment = await modelService.toggleSentiment(review.comment, review.sentiment).catch(e => {
+  review.sentiment = await modelService.toggleSentiment(review.comment, !review.sentiment).catch(e => {
     console.error(e);
     return review.sentiment;
   });
@@ -135,23 +135,35 @@ export default function Restaurant() {
             {restaurant.description}
           </div>
 
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Add Your Review</h2>
-          <form method="post" className="min-w-[400px] max-w-2xl">
-            <div className="mt-2 flex">
-              <textarea id="comment" name="comment" rows={3} className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"></textarea>
+          <div className="py-4">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Statistics</h2>
+            <div className="flex flex-col text-center min-w-[400px] p-4 pl-0 gap-2 font-semibold">
+              <div className="flex flex-row gap-4">
+                <span>😄</span>
+                <span>{positiveCount}</span>
+              </div>
+              <div className="flex flex-row gap-4">
+                <span>😐</span>
+                <span>{negativeCount}</span>
+              </div>
             </div>
-            <div className="mt-4 flex items-center gap-x-6">
-              <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
-            </div>
-            <input type="hidden" name="action" value="add-review" />
-          </form>
+          </div>
+
+          <div className="py-4">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Add Your Review</h2>
+            <form method="post" className="min-w-[400px] max-w-2xl">
+              <div className="mt-2 flex">
+                <textarea id="comment" name="comment" rows={3} className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"></textarea>
+              </div>
+              <div className="mt-4 flex items-center gap-x-6">
+                <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
+              </div>
+              <input type="hidden" name="action" value="add-review" />
+            </form>
+          </div>
         </div>
         <div className="basis-1/2">
           <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Reviews</h2>
-          <div className="flex flex-row text-center min-w-[400px] mt-4 mb-4">
-            <div className="basis-1/2">😄 {positiveCount}</div>
-            <div className="basis-1/2">😐 {negativeCount}</div>
-          </div>
           <div className="overflow-y-auto max-h-[60vh]">
             <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
               {restaurant.reviews.map((review) => (

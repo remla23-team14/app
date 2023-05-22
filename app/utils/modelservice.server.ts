@@ -14,12 +14,15 @@ class ModelService {
       .then(res => res.json());
   }
 
-  async predictSentiment(msg: string): Promise<boolean> {
-    return this.fetchModelService('/predict', { msg }).then(res => res.result === 'true');
+  async predictSentiment(review: string): Promise<boolean> {
+    return this.fetchModelService('/predict', { review }).then(data => data.sentiment === 'true');
   }
 
-  async toggleSentiment(msg: string, sentiment: boolean): Promise<boolean> {
-    return this.fetchModelService('/toggle-sentiment', { msg, sentiment }).then(res => res.result === 'true');
+  async toggleSentiment(review: string, sentiment: boolean): Promise<boolean> {
+    return this.fetchModelService('/toggle-sentiment', {
+      review,
+      sentiment: String(sentiment),
+    }).then(data => data.sentiment === 'true');
   }
 }
 
