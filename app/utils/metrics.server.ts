@@ -55,6 +55,7 @@ if (global.__metrics__) {
   metrics = global.__metrics__;
 } else {
   metrics = new Metrics();
+  metrics.registerMetrics();
   global.__metrics__ = metrics;
 }
 
