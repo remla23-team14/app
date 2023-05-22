@@ -1,10 +1,11 @@
 import type {ActionArgs, LoaderArgs} from '@remix-run/node';
 import {json} from '@remix-run/node';
-import {useActionData, useLoaderData} from '@remix-run/react';
+import {useLoaderData} from '@remix-run/react';
 
 import {db} from "~/utils/db.server";
 import {modelService} from '~/utils/modelservice.server';
 import {metrics} from '~/utils/metrics.server';
+import Back from '~/components/back';
 
 function registerPageVisit(request: Request, restaurant: {id: string; name: string}) {
   metrics.pageVisitsCounter.labels({
@@ -15,8 +16,7 @@ function registerPageVisit(request: Request, restaurant: {id: string; name: stri
   }).inc();
 }
 
-export const action = async ({ request, params }: ActionArgs) => {
-  const form = await request.formData();
+async function handleAddComment({request, params}: ActionArgs, form: FormData) {
   const comment = form.get("comment");
   if (typeof comment !== "string") {
     throw new Error("Invalid comment");
@@ -29,7 +29,7 @@ export const action = async ({ request, params }: ActionArgs) => {
 
   registerPageVisit(request, restaurant);
 
-  const sentiment = await modelService.fetchSentiment(comment).catch(e => {
+  const sentiment = await modelService.predictSentiment(comment).catch(e => {
     console.error(e);
     return null;
   });
@@ -41,7 +41,62 @@ export const action = async ({ request, params }: ActionArgs) => {
   };
 
   const review = await db.review.create({ data });
-  return json(review);
+  return { review };
+}
+
+async function handleRefreshSentiment({request, params}: ActionArgs, form: FormData) {
+  const reviewId = form.get("reviewId");
+  if (typeof reviewId !== "string") throw new Error("Invalid reviewId");
+
+  const review = await db.review.findUnique({ where: { id: reviewId } });
+  if (!review) throw new Error("Review not found");
+
+  review.sentiment = await modelService.predictSentiment(review.comment).catch(e => {
+    console.error(e);
+    return null;
+  });
+  await db.review.update({ where: { id: reviewId }, data: review });
+
+  return { review };
+}
+
+async function handleToggleSentiment({request, params}: ActionArgs, form: FormData) {
+  const reviewId = form.get("reviewId");
+  if (typeof reviewId !== "string") throw new Error("Invalid reviewId");
+
+  const review = await db.review.findUnique({ where: { id: reviewId } });
+  if (!review) throw new Error("Review not found");
+  if (review.sentiment == null) throw new Error("Review has no sentiment");
+
+  review.sentiment = await modelService.toggleSentiment(review.comment, !review.sentiment).catch(e => {
+    console.error(e);
+    return review.sentiment;
+  });
+  await db.review.update({ where: { id: reviewId }, data: review });
+
+  return { review };
+}
+
+export const action = async (args: ActionArgs) => {
+  const form = await args.request.formData();
+  const action = form.get("action");
+
+  let data = null;
+  switch (action) {
+    case "add-review":
+      data = await handleAddComment(args, form);
+      break;
+    case "refresh-sentiment":
+      data = await handleRefreshSentiment(args, form);
+      break;
+    case "toggle-sentiment":
+      data = await handleToggleSentiment(args, form);
+      break;
+    default:
+      return json({ error: "Invalid action" }, { status: 400 });
+  }
+
+  return json({ action, data });
 };
 
 export const loader = async ({ params, request }: LoaderArgs) => {
@@ -61,38 +116,71 @@ export const loader = async ({ params, request }: LoaderArgs) => {
 
 export default function Restaurant() {
   const { restaurant } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  if (actionData && !restaurant.reviews.some(review => review.id === actionData.id)) {
-    restaurant.reviews.push(actionData);
-  }
+  const [positiveCount, negativeCount] = restaurant.reviews.reduce(([pos, neg], { sentiment }) => {
+    if (sentiment == null) return [pos, neg];
+    return sentiment ? [pos + 1, neg] : [pos, neg + 1];
+  }, [0, 0]);
 
   return (
-    <div>
-      <div className="flex flex-col items-center justify-center">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">{restaurant.name}</h1>
-        <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:max-w-7xl lg:px-8 whitespace-pre">
-          {restaurant.description}
-        </div>
-
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Add Your Review</h2>
-        <form method="post" className="min-w-[400px]">
-          <div className="mt-2 flex">
-            <textarea id="comment" name="comment" rows={3} className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"></textarea>
-          </div>
-          <div className="mt-6 flex items-center justify-end gap-x-6">
-            <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
-          </div>
-        </form>
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Reviews</h2>
-        <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
-          {restaurant.reviews.map((review) => (
-            <div key={review.id} className="border-b last:border-0 border-gray-200 py-4">
-              <p className="text-lg leading-8 text-gray-600">
-                <span className="mr-4">{parseSentiment(review.sentiment)}</span>
-                {review.comment}
-              </p>
+    <div className="m-16 mt-0">
+      <div className="flex gap-24 flex-row">
+        <div className="basis-1/2">
+          <div className="flex flex-row items-center gap-8">
+            <div className="flex-initial">
+              <Back to="/restaurants" />
             </div>
-          ))}
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">{restaurant.name}</h1>
+          </div>
+          <div className="max-w-2xl py-8">
+            {restaurant.description}
+          </div>
+
+          <div className="py-4">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Statistics</h2>
+            <div className="flex flex-col text-center min-w-[400px] p-4 pl-0 gap-2 font-semibold">
+              <div className="flex flex-row gap-4">
+                <span>😄</span>
+                <span>{positiveCount}</span>
+              </div>
+              <div className="flex flex-row gap-4">
+                <span>😐</span>
+                <span>{negativeCount}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="py-4">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">Add Your Review</h2>
+            <form method="post" className="min-w-[400px] max-w-2xl">
+              <div className="mt-2 flex">
+                <textarea id="comment" name="comment" rows={3} className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"></textarea>
+              </div>
+              <div className="mt-4 flex items-center gap-x-6">
+                <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
+              </div>
+              <input type="hidden" name="action" value="add-review" />
+            </form>
+          </div>
+        </div>
+        <div className="basis-1/2">
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">Reviews</h2>
+          <div className="overflow-y-auto max-h-[60vh]">
+            <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+              {restaurant.reviews.map((review) => (
+                <div key={review.id} className="border-b last:border-0 border-gray-200 py-4">
+                  <div className="flex gap-4 text-lg leading-8 text-gray-600 min-w-[400px]">
+                    <span>{parseSentiment(review.sentiment)}</span>
+                    <p className="grow inline-block">{review.comment}</p>
+                    <form method="post" className="inline-block">
+                      <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">{review.sentiment == null ? 'Refresh' : 'Toggle'}</button>
+                      <input type="hidden" name="reviewId" value={review.id} />
+                      <input type="hidden" name="action" value={review.sentiment == null ? 'refresh-sentiment' : 'toggle-sentiment'} />
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
