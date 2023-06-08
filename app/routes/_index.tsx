@@ -1,7 +1,10 @@
 import { db } from "~/utils/db.server";
 import {useLoaderData} from '@remix-run/react';
-import {json, LoaderArgs} from '@remix-run/node';
+import type { LoaderArgs} from '@remix-run/node';
+import {json} from '@remix-run/node';
 import {metrics} from '~/utils/metrics.server';
+import {getPublicEnv} from "~/utils/env.server";
+import ColorButton from "~/components/colorbutton";
 
 export const loader = async ({ request }: LoaderArgs) => {
   metrics.pageVisitsCounter.labels({
@@ -13,6 +16,7 @@ export const loader = async ({ request }: LoaderArgs) => {
 
   return json({
     restaurantCount: await db.restaurant.count(),
+    ENV: getPublicEnv(),
   });
 };
 
@@ -24,7 +28,9 @@ export default function Index() {
         <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">{data.restaurantCount} Restaurants</h1>
         <p className="mt-6 text-lg leading-8 text-gray-600">Add your review to our selection of great restaurants in the neighbourhood of Delft!</p>
         <div className="mt-10 flex items-center justify-center gap-x-6">
-          <a href="/restaurants" className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Explore Restaurants</a>
+          <a href="/restaurants">
+            <ColorButton color={data.ENV.BUTTON_COLOR}>Explore Restaurants</ColorButton>
+          </a>
         </div>
       </div>
     </div>

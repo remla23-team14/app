@@ -6,6 +6,8 @@ import {db} from "~/utils/db.server";
 import {modelService} from '~/utils/modelservice.server';
 import {metrics} from '~/utils/metrics.server';
 import Back from '~/components/back';
+import {getPublicEnv} from "~/utils/env.server";
+import ColorButton from "~/components/colorbutton";
 
 function registerPageVisit(request: Request, restaurant: {id: string; name: string}) {
   metrics.pageVisitsCounter.labels({
@@ -111,11 +113,14 @@ export const loader = async ({ params, request }: LoaderArgs) => {
   }
 
   registerPageVisit(request, restaurant);
-  return json({ restaurant });
+  return json({
+    restaurant,
+    ENV: getPublicEnv(),
+  });
 };
 
 export default function Restaurant() {
-  const { restaurant } = useLoaderData<typeof loader>();
+  const { restaurant, ENV } = useLoaderData<typeof loader>();
   const [positiveCount, negativeCount] = restaurant.reviews.reduce(([pos, neg], { sentiment }) => {
     if (sentiment == null) return [pos, neg];
     return sentiment ? [pos + 1, neg] : [pos, neg + 1];
@@ -127,7 +132,7 @@ export default function Restaurant() {
         <div className="basis-1/2">
           <div className="flex flex-row items-center gap-8">
             <div className="flex-initial">
-              <Back to="/restaurants" />
+              <Back to="/restaurants" color={ENV.BUTTON_COLOR} />
             </div>
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">{restaurant.name}</h1>
           </div>
@@ -156,7 +161,9 @@ export default function Restaurant() {
                 <textarea id="comment" name="comment" rows={3} className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"></textarea>
               </div>
               <div className="mt-4 flex items-center gap-x-6">
-                <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
+                <button type="submit">
+                  <ColorButton color={ENV.BUTTON_COLOR}>Save</ColorButton>
+                </button>
               </div>
               <input type="hidden" name="action" value="add-review" />
             </form>
@@ -172,7 +179,11 @@ export default function Restaurant() {
                     <span>{parseSentiment(review.sentiment)}</span>
                     <p className="grow inline-block">{review.comment}</p>
                     <form method="post" className="inline-block">
-                      <button type="submit" className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">{review.sentiment == null ? 'Refresh' : 'Toggle'}</button>
+                      <button type="submit" className="">
+                        <ColorButton color={ENV.BUTTON_COLOR}>
+                          {review.sentiment == null ? 'Refresh' : 'Toggle'}
+                        </ColorButton>
+                      </button>
                       <input type="hidden" name="reviewId" value={review.id} />
                       <input type="hidden" name="action" value={review.sentiment == null ? 'refresh-sentiment' : 'toggle-sentiment'} />
                     </form>
