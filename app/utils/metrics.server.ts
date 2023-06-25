@@ -10,6 +10,8 @@ declare global {
 
 class Metrics {
   public pageVisitsCounter: Prometheus.Counter<string>;
+  public httpRequestsSummary: Prometheus.Summary<string>;
+  public httpRequestsHistogram: Prometheus.Histogram<string>;
   public metricsApp: Promise<Express>;
   public registered: boolean = false;
 
@@ -18,6 +20,16 @@ class Metrics {
       name: 'app_page_visits',
       help: 'Total number of visits',
       labelNames: ['method', 'path', 'restaurantId', 'restaurantName'],
+    });
+    this.httpRequestsSummary = new Prometheus.Summary({
+      name: 'app_http_requests_summary',
+      help: 'Total number of http requests',
+      labelNames: ['method', 'path', 'status'],
+    });
+    this.httpRequestsHistogram = new Prometheus.Histogram({
+      name: 'app_http_requests_histogram',
+      help: 'Total number of http requests',
+      labelNames: ['method', 'path', 'status'],
     });
     this.metricsApp = this.createMetricsApp();
   }
@@ -38,6 +50,7 @@ class Metrics {
       prom({
         metricsPath: '/metrics',
         prefix: 'app_',
+        collectDefaultMetrics: false,
       }),
     );
 

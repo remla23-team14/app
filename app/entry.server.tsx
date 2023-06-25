@@ -11,28 +11,40 @@ import { Response } from "@remix-run/node";
 import { RemixServer } from "@remix-run/react";
 import isbot from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
+import { metrics } from '~/utils/metrics.server';
 
 const ABORT_DELAY = 5_000;
 
-export default function handleRequest(
+export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  return isbot(request.headers.get("user-agent"))
-    ? handleBotRequest(
+  const ends = [metrics.httpRequestsSummary, metrics.httpRequestsHistogram].map((m) => m.startTimer());
+  const res: any = isbot(request.headers.get("user-agent"))
+    ? await handleBotRequest(
         request,
         responseStatusCode,
         responseHeaders,
         remixContext
       )
-    : handleBrowserRequest(
+    : await handleBrowserRequest(
         request,
         responseStatusCode,
         responseHeaders,
         remixContext
       );
+
+  const labels = {
+    method: request.method,
+    path: request.url,
+    status: res.status,
+  };
+  for (const end of ends) {
+    end(labels);
+  }
+  return res;
 }
 
 function handleBotRequest(
