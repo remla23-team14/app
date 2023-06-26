@@ -1,5 +1,5 @@
 # base node image
-FROM node:20 as base
+FROM node:20.2 as base
 ENV NODE_ENV production
 RUN apt-get update && apt-get install -y openssl sqlite3
 
@@ -51,6 +51,6 @@ COPY --from=build /app/start.sh /app/start.sh
 COPY --from=build /app/prisma /app/prisma
 
 RUN npx prisma db push
-RUN npx ts-node --require tsconfig-paths/register prisma/seed.ts
+RUN npx ts-node prisma/seed
 
 ENTRYPOINT [ "./start.sh" ]
